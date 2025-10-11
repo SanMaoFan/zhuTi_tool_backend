@@ -1,0 +1,28 @@
+{
+  "name": "zhuti_tool_backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node --transpile-only -r tsconfig-paths/register ./src/app.ts",
+    "build": "tsc && tsc-alias"
+  },
+  "_moduleAliases": {
+    "@router": "./src/router",
+    "@db": "./src/db",
+    "@utils": "./src/utils"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.7.0",
+    "mysql": "^2.18.1",
+    "tsc-alias": "^1.8.16",
+    "tsconfig-paths": "^4.2.0"
+  }
+}
