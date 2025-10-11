@@ -12,13 +12,14 @@ const mysql = require("@db/connect/db")
 const { getHash: hashUtils, mysqlCallback } = require('@utils/index')
 
 
+// 要获取的列
+    const columnList = ['type_id AS typeId', "type_name AS typeName", "create_date AS createDate", "type_descript AS typeDescript", "is_del AS isDel"]
 
 // 获取分页
-router.get('/', (req: e.Request, res: e.Response) => {
+router.post('/', (req: e.Request, res: e.Response) => {
     // 获取分页和条数参数
-    const { page = 1, pageNo = 10 } = req.query
-    // 要获取的列
-    const columnList = ['type_id', "type_name", "create_date", "type_descript", "is_del"]
+    console.log('获取 type 参数', req.body)
+    const { page = 1, pageNo = 10 } = req.body || {}
     const columnStr = columnList.join(',')
     const sql = `SELECT ${columnStr} FROM type_table WHERE is_del = 0 LIMIT ${(page as number) - 1},${pageNo};`
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
@@ -30,7 +31,7 @@ router.get('/', (req: e.Request, res: e.Response) => {
 
 // 新增
 router.post('/add', (req: e.Request, res: e.Response) => {
-    const { name, descript } = req.body
+    const { name, descript } = req.body || {}
     const newName = name?.trim()
     const newDescript = descript?.trim()
     if (!newName) {
@@ -60,7 +61,8 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
             status: 500,
         })
     }
-    const sql = `SELECT * FROM type_table WHERE type_id = "${id}"`
+    
+    const sql = `SELECT ${columnList.join(',')}  FROM type_table WHERE type_id = "${id}"`
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: "success！",
@@ -73,7 +75,7 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
 // 更改
 router.put('/:id', (req: e.Request, res: e.Response) => {
     const { id } = req.params
-    const { name, descript } = req.body
+    const { name, descript } = req.body || {}
     const newName = name?.trim()
     const newDescript = descript?.trim()
     if (!newName) {
