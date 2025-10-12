@@ -12,16 +12,63 @@ const mysql = require("@db/connect/db")
 const { getHash: hashUtils, mysqlCallback } = require('@utils/index')
 
 
+interface TypeColumnInterface {
+    typeId: string
+    typeName: string
+    createDate: string
+    typeDescript: string
+    isDel: string
+    page: number
+    pageNo: number
+    date: boolean | string
+}
+
 // 要获取的列
-    const columnList = ['type_id AS typeId', "type_name AS typeName", "create_date AS createDate", "type_descript AS typeDescript", "is_del AS isDel"]
+const columnList = ['type_id AS typeId', "type_name AS typeName", "create_date AS createDate", "type_descript AS typeDescript", "is_del AS isDel"]
 
 // 获取分页
 router.post('/', (req: e.Request, res: e.Response) => {
     // 获取分页和条数参数
-    console.log('获取 type 参数', req.body)
-    const { page = 1, pageNo = 10 } = req.body || {}
+    const { page = 1, pageNo = 10, typeId,
+        typeName,
+        startDate,
+        endDate,
+        isDel = 0 } = req.body || {}
+    // 判断 开始日期 与 结束日期 是否有成对
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+        return res.status(200).json({
+            message: "开始日期 startDate 必须与结束日期 endDate 一起存在！",
+            status: 500
+        })
+    }
+    const objParams: { [key: string]: string | number | boolean | undefined } = {
+        typeId,
+        typeName,
+        isDel,
+        date: true
+    }
+
+    const objCondition: { [key: string]: string } = {
+        typeId: `type_id = "${typeId}"`,
+        typeName: `type_name LIKE "%${typeName}%"`,
+        isDel: `is_del = ${isDel}`,
+        date: `BETWEEN "${startDate}" AND "${endDate}"`
+    }
+
+    const conditionList: string[] = []
+
+    for (const i in objParams) {
+        if ('date' === i) {
+            if (startDate && endDate) {
+                conditionList.push(objCondition[i] as string)
+            }
+        } else if (undefined !== objParams[i]) {
+            conditionList.push(objCondition[i] as string)
+        }
+    }
+
     const columnStr = columnList.join(',')
-    const sql = `SELECT ${columnStr} FROM type_table WHERE is_del = 0 LIMIT ${(page as number) - 1},${pageNo};`
+    const sql = `SELECT ${columnStr} FROM type_table WHERE ${conditionList.join(" AND ")} LIMIT ${(page as number) - 1},${pageNo};`
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).send({ message: 'success', status: 200, data: { list: data, curPage: page, pageNo } })
     }, err)
@@ -61,7 +108,7 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
             status: 500,
         })
     }
-    
+
     const sql = `SELECT ${columnList.join(',')}  FROM type_table WHERE type_id = "${id}"`
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
