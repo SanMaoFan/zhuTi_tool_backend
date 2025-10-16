@@ -125,7 +125,7 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
         })
     }
 
-    const sql = `SELECT ${columnList.join(',')}  FROM type_table WHERE type_id = "${id}";`
+    const sql = `SELECT ${columnList.join(',')} FROM type_table WHERE type_id = "${id}";`
     console.log('--------------- start -------------')
     console.log('get type info sql:', sql)
     console.log('---------------- end --------------')

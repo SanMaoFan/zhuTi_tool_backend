@@ -162,11 +162,17 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
         console.log('select product info sql语句', sql)
         console.log('---------------- end --------------')
         mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-            return res.status(200).json({
-                message: "success！",
-                status: 200,
-                data: data[0]
+            const findParentSql = `SELECT type_name AS parentName FROM type_table WHERE type_id = "${data[0].parentId}";`
+            mysql.query(findParentSql, (parentErr: Error, parentData: any) => {
+                mysqlCallback(res, () => {
+                    return res.status(200).json({
+                        message: "success！",
+                        status: 200,
+                        data: { ...data[0], ...parentData[0] }
+                    })
+                }, parentErr)
             })
+
         }, err))
     } catch (e) {
         console.log('product info error:', e)

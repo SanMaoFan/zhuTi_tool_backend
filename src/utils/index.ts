@@ -16,7 +16,7 @@ function mysqlCallback(
     callback: () =>void,
     err: Error) {
     if (err) {
-        // console.log('数据错误:', err.message)
+        console.log('数据库请求错误:', err.message)
         return res.status(200).json({ message: err.message, status: 500, data: null })
     }
     callback?.()
