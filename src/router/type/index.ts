@@ -34,12 +34,16 @@ router.post('/', (req: e.Request, res: e.Response) => {
         startDate,
         endDate,
         isDel = 0 } = req.body || {}
+    let newStartDate, newEndDate
     // 判断 开始日期 与 结束日期 是否有成对
     if ((startDate && !endDate) || (!startDate && endDate)) {
         return res.status(200).json({
             message: "开始日期 startDate 必须与结束日期 endDate 一起存在！",
             status: 500
         })
+    } else {
+        newStartDate = new Date(startDate as string).toLocaleString('zh')
+        newEndDate = new Date(endDate as string).toLocaleString('zh')
     }
     const objParams: { [key: string]: string | number | boolean | undefined } = {
         typeId,
@@ -52,7 +56,7 @@ router.post('/', (req: e.Request, res: e.Response) => {
         typeId: `type_id = "${typeId}"`,
         typeName: `type_name LIKE "%${typeName}%"`,
         isDel: `is_del = ${isDel}`,
-        date: `BETWEEN "${startDate}" AND "${endDate}"`
+        date: `BETWEEN "${newStartDate}" AND "${newEndDate}"`
     }
 
     const conditionList: string[] = []
@@ -68,9 +72,18 @@ router.post('/', (req: e.Request, res: e.Response) => {
     }
 
     const columnStr = columnList.join(',')
-    const sql = `SELECT ${columnStr} FROM type_table WHERE ${conditionList.join(" AND ")} LIMIT ${(page as number) - 1},${pageNo};`
+    const sql = `SELECT ${columnStr}, (SELECT COUNT(*) AS total FROM type_table WHERE ${conditionList.join(" AND ")}) AS total FROM type_table WHERE ${conditionList.join(" AND ")} ORDER BY create_date DESC LIMIT ${(page as number) - 1},${pageNo};`
+    console.log('--------------- start -------------')
+    console.log('type list sql 语句：', sql)
+    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        res.status(200).send({ message: 'success', status: 200, data: { list: data, curPage: page, pageNo } })
+        let total = 0
+        const newData = data.map((item) => {
+            total = item.total
+            delete item.total
+            return item
+        })
+        res.status(200).send({ message: 'success', status: 200, data: { list: newData, curPage: page, count: data.length, total } })
     }, err)
     )
 })
@@ -89,7 +102,10 @@ router.post('/add', (req: e.Request, res: e.Response) => {
     }
     // 数据库新增数据
     const uuid = hashUtils()
-    const sql = `INSERT INTO type_table (type_id, type_name, type_descript) VALUES ("${uuid}", "${newName}", ${newDescript ? ('"' + newDescript + '"') : null})`
+    const sql = `INSERT INTO type_table (type_id, type_name, type_descript) VALUES ("${uuid}", "${newName}", ${newDescript ? ('"' + newDescript + '"') : null});`
+    console.log('--------------- start -------------')
+    console.log('add type sql:', sql)
+    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: 'success！',
@@ -109,7 +125,10 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
         })
     }
 
-    const sql = `SELECT ${columnList.join(',')}  FROM type_table WHERE type_id = "${id}"`
+    const sql = `SELECT ${columnList.join(',')}  FROM type_table WHERE type_id = "${id}";`
+    console.log('--------------- start -------------')
+    console.log('get type info sql:', sql)
+    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: "success！",
@@ -132,6 +151,9 @@ router.put('/:id', (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `UPDATE type_table SET type_name = "${name}", type_descript = ${newDescript ? ('"' + newDescript + '"') : null} WHERE type_id = "${id}"`
+    console.log('--------------- start -------------')
+    console.log('update type sql语句', sql)
+    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: 'success！',
@@ -152,6 +174,9 @@ router.delete('/:id', (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `UPDATE type_table SET is_del = 1 WHERE type_id = "${newId}"`
+    console.log('--------------- start -------------')
+    console.log('del type sql语句', sql)
+    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: 'success！',

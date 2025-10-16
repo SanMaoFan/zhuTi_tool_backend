@@ -30,7 +30,6 @@ const columnList = ["product_id AS productId", "product_name AS productName", "c
 
 // 分页
 router.post('/', async (req: e.Request, res: e.Response) => {
-    console.log('获取的参数', req.body)
     try {
         const { page = 1, pageNo = 10, productId,
             productName,
@@ -38,25 +37,30 @@ router.post('/', async (req: e.Request, res: e.Response) => {
             endDate,
             parentId,
             isDel = 0 }: Partial<TypeParamsInterface> = req.body || {}
+
+        let newStartDate, newEndDate
         // 判断 开始日期 与 结束日期 是否有成对
-        if((startDate && !endDate) || (!startDate && endDate)){
+        if ((startDate && !endDate) || (!startDate && endDate)) {
             return res.status(200).json({
                 message: "开始日期 startDate 必须与结束日期 endDate 一起存在！",
                 status: 500
             })
+        } else {
+            newStartDate = new Date(startDate as string).toLocaleString('zh')
+            newEndDate = new Date(endDate as string).toLocaleString('zh')
         }
-        // 判断参数是否存在，存在则进行条件搜索，但是其 AND 关键字该如何加入？
-        const objParams: {[key: string]: string | number | undefined | boolean} = {
+
+        const objParams: { [key: string]: string | number | undefined | boolean } = {
             productId,
             productName,
             parentId,
             date: true,
             isDel
         }
-        const objCondition: {[key: string]: string} = {
+        const objCondition: { [key: string]: string } = {
             productId: `product_id = "${productId}"`,
             productName: `product_Name LIKE "%${productName}%"`,
-            date: `(create_date BETWEEN "${startDate}" AND "${endDate}")`,
+            date: `(create_date BETWEEN "${newStartDate}" AND "${newEndDate}")`,
             parentId: `parent_id = "${parentId}"`,
             isDel: `is_del = ${isDel}`
         }
@@ -69,17 +73,24 @@ router.post('/', async (req: e.Request, res: e.Response) => {
                     queryList.push(objCondition.date as string)
                 }
             } else if (undefined !== objParams[i]) {
-                queryList.push(objCondition[i] as  string)
+                queryList.push(objCondition[i] as string)
             }
         }
-
-        const sql = `SELECT ${columnList.join(',')} FROM  product_table WHERE ${queryList.join(' AND ')} LIMIT ${page as number - 1}, ${pageNo}`
+        const sql = `SELECT ${columnList.join(',')}, (SELECT COUNT(*) FROM product_table WHERE ${queryList.join(' AND ')}) AS total FROM  product_table WHERE ${queryList.join(' AND ')} ORDER BY create_date DESC LIMIT ${page as number - 1}, ${pageNo};`
+        console.log('--------------- start -------------')
         console.log('select product list sql语句', sql)
+        console.log('---------------- end --------------')
         await mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
+            let total = 0
+            const newData = data.map(item => {
+                total = item.total
+                delete item.totoal
+                return item
+            })
             return res.status(200).json({
                 message: 'success！',
                 status: 200,
-                data: { list: data, curPage: page, pageNo }
+                data: { list: newData, curPage: page, count: newData.length, total }
             })
         }, err))
     } catch (e) {
@@ -100,6 +111,9 @@ router.post('/add', (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `INSERT INTO product_table (product_id, product_name, product_descript, parent_id) VALUES ("${uuid}", "${newName}", ${newDescript ? ('"' + newDescript + '"') : null}, "${newId}");`
+    console.log('--------------- start -------------')
+    console.log('add product sql:', sql)
+    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         return res.status(200).json({
             message: 'success！',
@@ -112,7 +126,7 @@ router.post('/add', (req: e.Request, res: e.Response) => {
 router.put("/:id", (req: e.Request, res: e.Response) => {
     const { id } = req.params
     const { name, descript, parentId } = req.body || {}
-    const newName = name?.trim, newDescript = descript.trim(), newParentId = parentId?.trim(), newId = id?.trim()
+    const newName = name?.trim(), newDescript = descript?.trim(), newParentId = parentId?.trim(), newId = id?.trim()
 
     if (!newName || !newId || !newParentId) {
         return res.status(200).json({
@@ -121,7 +135,9 @@ router.put("/:id", (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `UPDATE product_table SET product_name = "${newName}", product_descript = "${newDescript}", parent_id = "${newParentId}" WHERE product_id = "${newId}";`
-
+    console.log('--------------- start -------------')
+    console.log('update product sql语句', sql)
+    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         return res.status(200).json({
             message: 'success！',
@@ -132,22 +148,34 @@ router.put("/:id", (req: e.Request, res: e.Response) => {
 
 // 详情
 router.get('/:id', (req: e.Request, res: e.Response) => {
-    const { id } = req.params
-    const newId = id?.trim()
-    if (!newId) {
+    try {
+        const { id } = req.params
+        const newId = id?.trim()
+        if (!newId) {
+            return res.status(200).json({
+                message: "id 参数不能为空！",
+                status: 500
+            })
+        }
+        const sql = `SELECT ${columnList.join(',')} FROM product_table WHERE product_id = "${newId}"`
+        console.log('--------------- start -------------')
+        console.log('select product info sql语句', sql)
+        console.log('---------------- end --------------')
+        mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
+            return res.status(200).json({
+                message: "success！",
+                status: 200,
+                data: data[0]
+            })
+        }, err))
+    } catch (e) {
+        console.log('product info error:', e)
         return res.status(200).json({
-            message: "id 参数不能为空！",
-            status: 500
+            message: '请求发生错误！',
+            status: 503
         })
     }
-    const sql = `SELECT ${columnList.join(',')} FROM product_id WHERE product_id = "${newId}"`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        return res.status(200).json({
-            message: "success！",
-            status: 200,
-            data: data[0]
-        })
-    }, err))
+
 })
 
 
@@ -162,7 +190,9 @@ router.delete('/:id', (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `UPDATE product_table SET is_del = 1 WHERE product_id = "${newId}"`
+    console.log('--------------- start -------------')
     console.log('del product sql语句', sql)
+    console.log('---------------- end --------------')
 
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         return res.status(200).json({
