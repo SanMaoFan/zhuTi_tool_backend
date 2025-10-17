@@ -157,22 +157,26 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
                 status: 500
             })
         }
-        const sql = `SELECT ${columnList.join(',')} FROM product_table WHERE product_id = "${newId}"`
+        const newColumnList = columnList.map(item => {
+            return 'p.' + item
+        })
+        const sql = `SELECT t.type_name AS parentName, ${newColumnList.join(',')}
+        FROM product_table p
+        JOIN 
+        type_table AS t
+        ON p.parent_id = t.type_id
+        WHERE p.product_id = "${newId}";`
         console.log('--------------- start -------------')
         console.log('select product info sql语句', sql)
         console.log('---------------- end --------------')
-        mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-            const findParentSql = `SELECT type_name AS parentName FROM type_table WHERE type_id = "${data[0].parentId}";`
-            mysql.query(findParentSql, (parentErr: Error, parentData: any) => {
-                mysqlCallback(res, () => {
-                    return res.status(200).json({
-                        message: "success！",
-                        status: 200,
-                        data: { ...data[0], ...parentData[0] }
-                    })
-                }, parentErr)
-            })
 
+
+        mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
+            return res.status(200).json({
+                message: "success！",
+                status: 200,
+                data: { ...data[0] }
+            })
         }, err))
     } catch (e) {
         console.log('product info error:', e)
