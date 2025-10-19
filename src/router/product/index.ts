@@ -29,7 +29,7 @@ interface TypeParamsInterface {
 const columnList = ["product_id AS productId", "product_name AS productName", "create_date AS createDate", "product_descript AS productDescript", "parent_id AS parentId", "is_del AS isDel"]
 
 // 分页
-router.post('/', async (req: e.Request, res: e.Response) => {
+router.post('/', (req: e.Request, res: e.Response) => {
     try {
         const { page = 1, pageNo = 10, productId,
             productName,
@@ -77,10 +77,7 @@ router.post('/', async (req: e.Request, res: e.Response) => {
             }
         }
         const sql = `SELECT ${columnList.join(',')}, (SELECT COUNT(*) FROM product_table WHERE ${queryList.join(' AND ')}) AS total FROM  product_table WHERE ${queryList.join(' AND ')} ORDER BY create_date DESC LIMIT ${page as number - 1}, ${pageNo};`
-        console.log('--------------- start -------------')
-        console.log('select product list sql语句', sql)
-        console.log('---------------- end --------------')
-        await mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
+        mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
             let total = 0
             const newData = data.map(item => {
                 total = item.total
@@ -90,7 +87,12 @@ router.post('/', async (req: e.Request, res: e.Response) => {
             return res.status(200).json({
                 message: 'success！',
                 status: 200,
-                data: { list: newData, curPage: page, count: newData.length, total }
+                data: {
+                    list: newData,
+                    curPage: page,
+                    count: newData.length,
+                    total
+                }
             })
         }, err))
     } catch (e) {
@@ -111,9 +113,6 @@ router.post('/add', (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `INSERT INTO product_table (product_id, product_name, product_descript, parent_id) VALUES ("${uuid}", "${newName}", ${newDescript ? ('"' + newDescript + '"') : null}, "${newId}");`
-    console.log('--------------- start -------------')
-    console.log('add product sql:', sql)
-    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         return res.status(200).json({
             message: 'success！',
@@ -135,9 +134,6 @@ router.put("/:id", (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `UPDATE product_table SET product_name = "${newName}", product_descript = "${newDescript}", parent_id = "${newParentId}" WHERE product_id = "${newId}";`
-    console.log('--------------- start -------------')
-    console.log('update product sql语句', sql)
-    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         return res.status(200).json({
             message: 'success！',
@@ -166,9 +162,6 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
         type_table AS t
         ON p.parent_id = t.type_id
         WHERE p.product_id = "${newId}";`
-        console.log('--------------- start -------------')
-        console.log('select product info sql语句', sql)
-        console.log('---------------- end --------------')
 
 
         mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
@@ -199,10 +192,8 @@ router.delete('/:id', (req: e.Request, res: e.Response) => {
             status: 500,
         })
     }
+
     const sql = `UPDATE product_table SET is_del = 1 WHERE product_id = "${newId}"`
-    console.log('--------------- start -------------')
-    console.log('del product sql语句', sql)
-    console.log('---------------- end --------------')
 
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         return res.status(200).json({

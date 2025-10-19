@@ -73,9 +73,6 @@ router.post('/', (req: e.Request, res: e.Response) => {
 
     const columnStr = columnList.join(',')
     const sql = `SELECT ${columnStr}, (SELECT COUNT(*) AS total FROM type_table WHERE ${conditionList.join(" AND ")}) AS total FROM type_table WHERE ${conditionList.join(" AND ")} ORDER BY create_date DESC LIMIT ${(page as number) - 1},${pageNo};`
-    console.log('--------------- start -------------')
-    console.log('type list sql 语句：', sql)
-    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         let total = 0
         const newData = data.map((item) => {
@@ -83,7 +80,16 @@ router.post('/', (req: e.Request, res: e.Response) => {
             delete item.total
             return item
         })
-        res.status(200).send({ message: 'success', status: 200, data: { list: newData, curPage: page, count: data.length, total } })
+        res.status(200).send({
+            message: 'success！',
+            status: 200,
+            data: {
+                list: newData,
+                curPage: page,
+                count: newData.length,
+                total
+            }
+        })
     }, err)
     )
 })
@@ -103,9 +109,6 @@ router.post('/add', (req: e.Request, res: e.Response) => {
     // 数据库新增数据
     const uuid = hashUtils()
     const sql = `INSERT INTO type_table (type_id, type_name, type_descript) VALUES ("${uuid}", "${newName}", ${newDescript ? ('"' + newDescript + '"') : null});`
-    console.log('--------------- start -------------')
-    console.log('add type sql:', sql)
-    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: 'success！',
@@ -126,9 +129,6 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
     }
 
     const sql = `SELECT ${columnList.join(',')} FROM type_table WHERE type_id = "${id}";`
-    console.log('--------------- start -------------')
-    console.log('get type info sql:', sql)
-    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: "success！",
@@ -151,9 +151,6 @@ router.put('/:id', (req: e.Request, res: e.Response) => {
         })
     }
     const sql = `UPDATE type_table SET type_name = "${name}", type_descript = ${newDescript ? ('"' + newDescript + '"') : null} WHERE type_id = "${id}"`
-    console.log('--------------- start -------------')
-    console.log('update type sql语句', sql)
-    console.log('---------------- end --------------')
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         res.status(200).json({
             message: 'success！',
@@ -164,25 +161,50 @@ router.put('/:id', (req: e.Request, res: e.Response) => {
 })
 
 // 删除--逻辑删除
-router.delete('/:id', (req: e.Request, res: e.Response) => {
-    const { id } = req.params
-    const newId = id?.trim()
-    if (!newId) {
-        return res.status(200).json({
-            message: '缺少 id 参数！',
-            status: 500,
+router.delete('/:id', async (req: e.Request, res: e.Response) => {
+    let connection
+    try {
+        const { id } = req.params
+        const newId = id?.trim()
+        if (!newId) {
+            return res.status(200).json({
+                message: '缺少 id 参数！',
+                status: 500,
+            })
+        }
+
+        // 开始事务
+        await mysql.getConnection(async (err, connection) => {
+            if (err) {
+                console.log('type del module get connection error:', err)
+            } else {
+                connection.beginTransaction()
+                console.log('del type sql 事务执行中')
+                // 进行分类的删除逻辑
+                console.log('ID为', newId)
+                 connection.query(`UPDATE type_table SET is_del = 1 WHERE type_id = ?`, [newId])
+
+                // 进行物品的删除逻辑
+                 connection.query(`UPDATE product_table SET is_del = 1 WHERE parent_id = ?`, [newId])
+
+
+                // 6. 所有操作成功，提交事务
+                 connection.commit();
+                console.log('事务执行成功');
+                return res.status(200).json({
+                    message: 'success！',
+                    status: 200
+                })
+            }
         })
+
+    } catch (e) {
+        console.log('del type error:', e)
+        if (connection) {
+            connection?.rollback()
+        }
     }
-    const sql = `UPDATE type_table SET is_del = 1 WHERE type_id = "${newId}"`
-    console.log('--------------- start -------------')
-    console.log('del type sql语句', sql)
-    console.log('---------------- end --------------')
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        res.status(200).json({
-            message: 'success！',
-            status: 200
-        })
-    }, err))
+
 })
 
 

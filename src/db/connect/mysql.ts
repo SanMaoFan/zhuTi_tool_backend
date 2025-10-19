@@ -6,6 +6,9 @@ interface MySqlObjData {
     password: string
     database: string
     port: number
+    waitForConnections: boolean
+    connectionLimit: number
+    debug: boolean
 }
 
 const connection: { mysql: MySqlObjData } = {
@@ -14,7 +17,10 @@ const connection: { mysql: MySqlObjData } = {
         port: 3306,
         user: "root",
         password: "",
-        database: "zhuti_tool_database"
+        database: "zhuti_tool_database",
+        waitForConnections: true,
+        connectionLimit: 10,
+        debug: false, // 关键：开启调试模式，自动打印 SQL
     }
 }
 
