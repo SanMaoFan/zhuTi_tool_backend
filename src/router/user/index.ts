@@ -2,6 +2,8 @@ import type e = require("express")
 // express
 const express = require("express")
 const router = express.Router()
+const jwt = require('jsonwebtoken');
+
 
 // mysql
 const mysql = require("@db/connect/db")
@@ -10,8 +12,80 @@ const mysql = require("@db/connect/db")
 const { getHash: hashUtils, mysqlCallback } = require("@utils/index")
 
 
+
+
 // 要获取的列名
 const columnList = ["user_id AS userId", "user_name AS userName", "user_phone AS userPhone", "create_date AS createDate", "is_del AS isDel"]
+
+
+
+// 登录
+router.post('/login', async (req: e.Request, res: e.Response) => {
+    req.routerMatched = true
+    try {
+        const { userPhone, userPwd } = req.body || {}
+        const newUserPhone = userPhone?.trim()
+        const newUserPwd = userPwd?.trim()
+        if (!newUserPhone || !newUserPwd) {
+            return res.status(200).json({
+                status: 500,
+                message: '请传入用户手机号 userPhone 以及密码 userPwd！'
+            })
+        }
+        // 查询user_id
+        const queryUserExistSql = `SELECT * FROM user_table WHERE user_phone = ?`
+        const [result, fields] = await mysql.query(queryUserExistSql, [newUserPhone])
+
+        if (0 === result.length) {
+            return res.status(200).json({
+                message: '找不到该用户！',
+                status: 404
+            })
+        } else if (result[0].user_pwd === newUserPwd && newUserPhone === result[0].user_phone) {
+            const [{ user_id, user_name, user_phone }] = result
+            const token = jwt.sign(
+                // 存用户身份信息（
+                { userId: user_id, username: user_name },
+                // 用服务器密钥加密
+                process.env.SECRET_KEY,
+                // 配置（Token有效期1小时）
+                {
+                    expiresIn: '1h',
+                    algorithm: process.env.ALGORITHM
+                }
+            );
+            if (token) {
+                return res.status(200).json({
+                    message: '登录成功！',
+                    status: 200,
+                    data: {
+                        userPhone: user_phone,
+                        userName: user_name,
+                        token
+                    }
+                })
+            } else {
+                return res.status(200).json({
+                    message: 'token 处理错误！',
+                    status: 500
+                })
+            }
+        } else {
+            // 用户密码不对
+            return res.status(200).json({
+                status: 500,
+                message: '用户账号或者密码不对！'
+            })
+        }
+
+    } catch (e) {
+        console.log('user login error: ', e)
+        return res.status(200).json({
+            message: '处理错误，请重试！',
+            status: 500
+        })
+    }
+})
 
 // 分页
 router.post('/', (req: e.Request, res: e.Response) => {

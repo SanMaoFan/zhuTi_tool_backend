@@ -27,141 +27,195 @@ interface TypeColumnInterface {
 const columnList = ['type_id AS typeId', "type_name AS typeName", "create_date AS createDate", "type_descript AS typeDescript", "is_del AS isDel"]
 
 // 获取分页
-router.post('/', (req: e.Request, res: e.Response) => {
-    // 获取分页和条数参数
-    const { page = 1, pageNo = 10, typeId,
-        typeName,
-        startDate,
-        endDate,
-        isDel = 0 } = req.body || {}
-    let newStartDate, newEndDate
-    // 判断 开始日期 与 结束日期 是否有成对
-    if ((startDate && !endDate) || (!startDate && endDate)) {
-        return res.status(200).json({
-            message: "开始日期 startDate 必须与结束日期 endDate 一起存在！",
-            status: 500
-        })
-    } else {
-        newStartDate = new Date(startDate as string).toLocaleString('zh')
-        newEndDate = new Date(endDate as string).toLocaleString('zh')
-    }
-    const objParams: { [key: string]: string | number | boolean | undefined } = {
-        typeId,
-        typeName,
-        isDel,
-        date: true
-    }
+router.post('/', async (req: e.Request, res: e.Response) => {
+    console.log('经过了')
+    req.routerMatched = true
+    try {
+        // 获取分页和条数参数
+        const { page = 1, pageNo = 10, typeId,
+            typeName,
+            startDate,
+            endDate,
+            isDel = 0 } = req.body || {}
+        let newStartDate, newEndDate
+        // 判断 开始日期 与 结束日期 是否有成对
+        if ((startDate && !endDate) || (!startDate && endDate)) {
+            return res.status(200).json({
+                message: "开始日期 startDate 必须与结束日期 endDate 一起存在！",
+                status: 500
+            })
+        } else {
+            newStartDate = new Date(startDate as string).toLocaleString('zh')
+            newEndDate = new Date(endDate as string).toLocaleString('zh')
+        }
+        const objParams: { [key: string]: string | number | boolean | undefined } = {
+            typeId,
+            typeName,
+            isDel,
+            date: true
+        }
 
-    const objCondition: { [key: string]: string } = {
-        typeId: `type_id = "${typeId}"`,
-        typeName: `type_name LIKE "%${typeName}%"`,
-        isDel: `is_del = ${isDel}`,
-        date: `BETWEEN "${newStartDate}" AND "${newEndDate}"`
-    }
+        const objCondition: { [key: string]: string } = {
+            typeId: `type_id = "${typeId}"`,
+            typeName: `type_name LIKE "%${typeName}%"`,
+            isDel: `is_del = ${isDel}`,
+            date: `BETWEEN "${newStartDate}" AND "${newEndDate}"`
+        }
 
-    const conditionList: string[] = []
+        const conditionList: string[] = []
 
-    for (const i in objParams) {
-        if ('date' === i) {
-            if (startDate && endDate) {
+        for (const i in objParams) {
+            if ('date' === i) {
+                if (startDate && endDate) {
+                    conditionList.push(objCondition[i] as string)
+                }
+            } else if (undefined !== objParams[i]) {
                 conditionList.push(objCondition[i] as string)
             }
-        } else if (undefined !== objParams[i]) {
-            conditionList.push(objCondition[i] as string)
         }
-    }
 
-    const columnStr = columnList.join(',')
-    const sql = `SELECT ${columnStr}, (SELECT COUNT(*) AS total FROM type_table WHERE ${conditionList.join(" AND ")}) AS total FROM type_table WHERE ${conditionList.join(" AND ")} ORDER BY create_date DESC LIMIT ${(page as number) - 1},${pageNo};`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        let total = 0
-        const newData = data.map((item) => {
-            total = item.total
-            delete item.total
-            return item
-        })
-        res.status(200).send({
-            message: 'success！',
-            status: 200,
-            data: {
-                list: newData,
-                curPage: page,
-                count: newData.length,
-                total
-            }
-        })
-    }, err)
-    )
+        const columnStr = columnList.join(',')
+        const sql = `SELECT ${columnStr}, (SELECT COUNT(*) AS total FROM type_table WHERE ${conditionList.join(" AND ")}) AS total FROM type_table WHERE ${conditionList.join(" AND ")} ORDER BY create_date DESC LIMIT ${(page as number) - 1},${pageNo};`
+
+        const [result] = await mysql.query(sql)
+
+        if (result) {
+            let total = 0
+            const newData = result.map((item) => {
+                total = item.total
+                delete item.total
+                return item
+            })
+            res.status(200).send({
+                message: 'success！',
+                status: 200,
+                data: {
+                    list: newData,
+                    curPage: page,
+                    count: newData.length,
+                    total
+                }
+            })
+        } else {
+            return res.status(200).json({
+                message: "无数据",
+                status: 404
+            })
+        }
+    } catch (e) {
+        mysqlCallback(res, () => { }, e)
+        throw e
+    }
 })
 
 
 // 新增
-router.post('/add', (req: e.Request, res: e.Response) => {
-    const { name, descript } = req.body || {}
-    const newName = name?.trim()
-    const newDescript = descript?.trim()
-    if (!newName) {
-        return res.status(200).json({
-            message: 'name 参数需要传入值！',
-            status: 500,
-        })
+router.post('/add', async (req: e.Request, res: e.Response) => {
+    req.routerMatched = true
+    try {
+        const { name, descript } = req.body || {}
+        const newName = name?.trim()
+        const newDescript = descript?.trim()
+        if (!newName) {
+            return res.status(200).json({
+                message: 'name 参数需要传入值！',
+                status: 500,
+            })
+        }
+        // 数据库新增数据
+        const uuid = hashUtils()
+
+        const sql = `INSERT INTO type_table (type_id, type_name, type_descript) VALUES (?, ?, ?);`
+
+        const [result] = await mysql.query(sql, [uuid, newName, newDescript ? newDescript : null])
+
+        if (result) {
+            res.status(200).json({
+                message: 'success！',
+                status: 200,
+            })
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
+    } catch (e) {
+        mysqlCallback(res, () => { }, e)
+        throw e
     }
-    // 数据库新增数据
-    const uuid = hashUtils()
-    const sql = `INSERT INTO type_table (type_id, type_name, type_descript) VALUES ("${uuid}", "${newName}", ${newDescript ? ('"' + newDescript + '"') : null});`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        res.status(200).json({
-            message: 'success！',
-            status: 200,
-        })
-    }, err)
-    )
 })
 
 // 获取详情
-router.get('/:id', (req: e.Request, res: e.Response) => {
-    const { id } = req.params
-    if (!id) {
-        return res.status(200).json({
-            message: "缺少查询的 id！",
-            status: 500,
-        })
-    }
+router.get('/:id', async (req: e.Request, res: e.Response) => {
+    req.routerMatched = true
+    try {
+        const { id } = req.params
+        if (!id) {
+            return res.status(200).json({
+                message: "缺少查询的 id！",
+                status: 500,
+            })
+        }
 
-    const sql = `SELECT ${columnList.join(',')} FROM type_table WHERE type_id = "${id}";`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        res.status(200).json({
-            message: "success！",
-            status: 200,
-            data: data[0]
-        })
-    }, err))
+        const sql = `SELECT ${columnList.join(',')} FROM type_table WHERE type_id = ?;`
+        const [result] = await mysql.query(sql, [id])
+
+        if (result) {
+            return res.status(200).json({
+                message: "success！",
+                status: 200,
+                data: result[0]
+            })
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
+    } catch (e) {
+        mysqlCallback(res, () => { }, e)
+        throw e
+    }
 })
 
 // 更改
-router.put('/:id', (req: e.Request, res: e.Response) => {
-    const { id } = req.params
-    const { name, descript } = req.body || {}
-    const newName = name?.trim()
-    const newDescript = descript?.trim()
-    if (!newName) {
-        return res.status(200).json({
-            message: 'name 参数不能为空！',
-            status: 500,
-        })
+router.put('/:id', async (req: e.Request, res: e.Response) => {
+    req.routerMatched = true
+    try {
+        const { id } = req.params
+        const { name, descript } = req.body || {}
+        const newName = name?.trim()
+        const newDescript = descript?.trim()
+        if (!newName) {
+            return res.status(200).json({
+                message: 'name 参数不能为空！',
+                status: 500,
+            })
+        }
+        const sql = `UPDATE type_table SET type_name = ?, type_descript = ? WHERE type_id = ?`
+        const [result] = await mysql.query(sql, [newName, newDescript ? newDescript : null, id])
+        if (result) {
+            return res.status(200).json({
+                message: 'success！',
+                status: 200,
+            })
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
+    } catch (e) {
+        mysqlCallback(res, () => { }, e)
+        throw e
     }
-    const sql = `UPDATE type_table SET type_name = "${name}", type_descript = ${newDescript ? ('"' + newDescript + '"') : null} WHERE type_id = "${id}"`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        res.status(200).json({
-            message: 'success！',
-            status: 200,
-        })
-    }, err)
-    )
+
 })
 
 // 删除--逻辑删除
 router.delete('/:id', async (req: e.Request, res: e.Response) => {
+    req.routerMatched = true
     let connection
     try {
         const { id } = req.params
@@ -182,14 +236,14 @@ router.delete('/:id', async (req: e.Request, res: e.Response) => {
                 console.log('del type sql 事务执行中')
                 // 进行分类的删除逻辑
                 console.log('ID为', newId)
-                 connection.query(`UPDATE type_table SET is_del = 1 WHERE type_id = ?`, [newId])
+                connection.query(`UPDATE type_table SET is_del = 1 WHERE type_id = ?`, [newId])
 
                 // 进行物品的删除逻辑
-                 connection.query(`UPDATE product_table SET is_del = 1 WHERE parent_id = ?`, [newId])
+                connection.query(`UPDATE product_table SET is_del = 1 WHERE parent_id = ?`, [newId])
 
 
                 // 6. 所有操作成功，提交事务
-                 connection.commit();
+                connection.commit();
                 console.log('事务执行成功');
                 return res.status(200).json({
                     message: 'success！',
@@ -199,10 +253,11 @@ router.delete('/:id', async (req: e.Request, res: e.Response) => {
         })
 
     } catch (e) {
-        console.log('del type error:', e)
         if (connection) {
             connection?.rollback()
         }
+        throw e
+
     }
 
 })

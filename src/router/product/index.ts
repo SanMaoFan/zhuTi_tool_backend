@@ -29,8 +29,9 @@ interface TypeParamsInterface {
 const columnList = ["product_id AS productId", "product_name AS productName", "create_date AS createDate", "product_descript AS productDescript", "parent_id AS parentId", "is_del AS isDel"]
 
 // 分页
-router.post('/', (req: e.Request, res: e.Response) => {
+router.post('/', async (req: e.Request, res: e.Response) => {
     try {
+        req.routerMatched = true
         const { page = 1, pageNo = 10, productId,
             productName,
             startDate,
@@ -76,10 +77,12 @@ router.post('/', (req: e.Request, res: e.Response) => {
                 queryList.push(objCondition[i] as string)
             }
         }
-        const sql = `SELECT ${columnList.join(',')}, (SELECT COUNT(*) FROM product_table WHERE ${queryList.join(' AND ')}) AS total FROM  product_table WHERE ${queryList.join(' AND ')} ORDER BY create_date DESC LIMIT ${page as number - 1}, ${pageNo};`
-        mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
+        const sql = `SELECT ${columnList.join(',')}, (SELECT COUNT(*) FROM product_table WHERE ${queryList.join(' AND ')}) AS total FROM  product_table WHERE ${queryList.join(' AND ')} ORDER BY create_date DESC LIMIT ?, ?;`
+        const [result] = await mysql.query(sql, [page as number - 1, pageNo])
+
+        if (result) {
             let total = 0
-            const newData = data.map(item => {
+            const newData = result.map(item => {
                 total = item.total
                 delete item.totoal
                 return item
@@ -94,56 +97,86 @@ router.post('/', (req: e.Request, res: e.Response) => {
                     total
                 }
             })
-        }, err))
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
     } catch (e) {
-        console.log('getProductList error: ', e)
+        mysqlCallback(res, () => { }, e)
+        throw e
     }
-
 })
 
 // 新增
-router.post('/add', (req: e.Request, res: e.Response) => {
-    const { name, parentId, descript } = req.body || {}
-    const uuid = hashUtils()
-    const newName = name?.trim(), newId = parentId?.trim(), newDescript = descript?.trim()
-    if (!newName || !newId) {
-        return res.status(200).json({
-            message: '名称 name 以及父 id 不能为空！',
-            status: 500
-        })
+router.post('/add', async (req: e.Request, res: e.Response) => {
+        req.routerMatched = true
+    try {
+        const { name, parentId, descript } = req.body || {}
+        const uuid = hashUtils()
+        const newName = name?.trim(), newId = parentId?.trim(), newDescript = descript?.trim()
+        if (!newName || !newId) {
+            return res.status(200).json({
+                message: '名称 name 以及父 id 不能为空！',
+                status: 500
+            })
+        }
+        const sql = `INSERT INTO product_table (product_id, product_name, product_descript, parent_id) VALUES (?, ?, ?, ?);`
+        const [result] = await mysql.query(sql, [uuid, newName, newDescript ? newDescript : null, newId])
+        if (result) {
+            return res.status(200).json({
+                message: 'success！',
+                status: 200,
+            })
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
+    } catch (e) {
+        mysqlCallback(res, () => { }, e)
+        throw e
     }
-    const sql = `INSERT INTO product_table (product_id, product_name, product_descript, parent_id) VALUES ("${uuid}", "${newName}", ${newDescript ? ('"' + newDescript + '"') : null}, "${newId}");`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        return res.status(200).json({
-            message: 'success！',
-            status: 200,
-        })
-    }, err))
 })
 
 // 更改
-router.put("/:id", (req: e.Request, res: e.Response) => {
-    const { id } = req.params
-    const { name, descript, parentId } = req.body || {}
-    const newName = name?.trim(), newDescript = descript?.trim(), newParentId = parentId?.trim(), newId = id?.trim()
+router.put("/:id", async (req: e.Request, res: e.Response) => {
+        req.routerMatched = true
+    try {
+        const { id } = req.params
+        const { name, descript, parentId } = req.body || {}
+        const newName = name?.trim(), newDescript = descript?.trim(), newParentId = parentId?.trim(), newId = id?.trim()
 
-    if (!newName || !newId || !newParentId) {
-        return res.status(200).json({
-            message: '商品 id 、名称 name 以及父 id 不能为空！',
-            status: 500
-        })
+        if (!newName || !newId || !newParentId) {
+            return res.status(200).json({
+                message: '商品 id 、名称 name 以及父 id 不能为空！',
+                status: 500
+            })
+        }
+        const sql = `UPDATE product_table SET product_name = ?, product_descript = ?, parent_id = ? WHERE product_id = ?;`
+        const [result] = await mysql.query(sql, [newName, newDescript ? newDescript : null, newParentId, newId])
+        if (result) {
+            return res.status(200).json({
+                message: 'success！',
+                status: 200
+            })
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
+    } catch (e) {
+        mysqlCallback(res, () => { }, e)
+        throw e
     }
-    const sql = `UPDATE product_table SET product_name = "${newName}", product_descript = "${newDescript}", parent_id = "${newParentId}" WHERE product_id = "${newId}";`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        return res.status(200).json({
-            message: 'success！',
-            status: 200
-        })
-    }, err))
 })
 
 // 详情
-router.get('/:id', (req: e.Request, res: e.Response) => {
+router.get('/:id', async (req: e.Request, res: e.Response) => {
+        req.routerMatched = true
     try {
         const { id } = req.params
         const newId = id?.trim()
@@ -161,46 +194,61 @@ router.get('/:id', (req: e.Request, res: e.Response) => {
         JOIN 
         type_table AS t
         ON p.parent_id = t.type_id
-        WHERE p.product_id = "${newId}";`
+        WHERE p.product_id = ?;`
 
-
-        mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
+        const [result] = await mysql.query(sql, [newId])
+        if (result) {
             return res.status(200).json({
                 message: "success！",
                 status: 200,
-                data: { ...data[0] }
+                data: { ...result[0] }
             })
-        }, err))
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
     } catch (e) {
-        console.log('product info error:', e)
-        return res.status(200).json({
-            message: '请求发生错误！',
-            status: 503
-        })
+        mysqlCallback(res, () => { }, e)
+        throw e
     }
 
 })
 
 
 // 删除
-router.delete('/:id', (req: e.Request, res: e.Response) => {
-    const { id } = req.params
-    const newId = id?.trim()
-    if (!newId) {
-        return res.status(200).json({
-            message: '缺少 id 参数！',
-            status: 500,
-        })
+router.delete('/:id', async (req: e.Request, res: e.Response) => {
+        req.routerMatched = true
+    try {
+        const { id } = req.params
+        const newId = id?.trim()
+        if (!newId) {
+            return res.status(200).json({
+                message: '缺少 id 参数！',
+                status: 500,
+            })
+        }
+
+        const sql = `UPDATE product_table SET is_del = 1 WHERE product_id = ?`
+
+        const [result] = await mysql.query(sql, [newId])
+        if (result) {
+            return res.status(200).json({
+                message: "success！",
+                status: 200
+            })
+        } else {
+            return res.status(200).json({
+                message: '数据库获取数据不正常',
+                status: 500
+            })
+        }
+    } catch (e) {
+        mysqlCallback(res, () => { }, e)
+        throw e
     }
 
-    const sql = `UPDATE product_table SET is_del = 1 WHERE product_id = "${newId}"`
-
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        return res.status(200).json({
-            message: "success！",
-            status: 200
-        })
-    }, err))
 })
 
 
