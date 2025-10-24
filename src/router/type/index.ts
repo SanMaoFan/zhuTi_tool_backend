@@ -28,8 +28,7 @@ const columnList = ['type_id AS typeId', "type_name AS typeName", "create_date A
 
 // 获取分页
 router.post('/', async (req: e.Request, res: e.Response) => {
-    console.log('经过了')
-    req.routerMatched = true
+    
     try {
         // 获取分页和条数参数
         const { page = 1, pageNo = 10, typeId,
@@ -75,24 +74,22 @@ router.post('/', async (req: e.Request, res: e.Response) => {
         }
 
         const columnStr = columnList.join(',')
-        const sql = `SELECT ${columnStr}, (SELECT COUNT(*) AS total FROM type_table WHERE ${conditionList.join(" AND ")}) AS total FROM type_table WHERE ${conditionList.join(" AND ")} ORDER BY create_date DESC LIMIT ${(page as number) - 1},${pageNo};`
 
+        const totalSql = `SELECT COUNT(*) AS total FROM type_table WHERE ${conditionList.join(" AND ")}`
+        const sql = `SELECT ${columnStr} FROM type_table WHERE ${conditionList.join(" AND ")} ORDER BY create_date DESC LIMIT ${((page as number) - 1) * pageNo},${pageNo};`
+
+        const [totalResult] = await mysql.query(totalSql)
         const [result] = await mysql.query(sql)
 
-        if (result) {
-            let total = 0
-            const newData = result.map((item) => {
-                total = item.total
-                delete item.total
-                return item
-            })
+        if (result && totalResult) {
+            const [{ total }] = totalResult
             res.status(200).send({
                 message: 'success！',
                 status: 200,
                 data: {
-                    list: newData,
+                    list: result,
                     curPage: page,
-                    count: newData.length,
+                    count: result.length,
                     total
                 }
             })
@@ -111,7 +108,7 @@ router.post('/', async (req: e.Request, res: e.Response) => {
 
 // 新增
 router.post('/add', async (req: e.Request, res: e.Response) => {
-    req.routerMatched = true
+    
     try {
         const { name, descript } = req.body || {}
         const newName = name?.trim()
@@ -148,7 +145,7 @@ router.post('/add', async (req: e.Request, res: e.Response) => {
 
 // 获取详情
 router.get('/:id', async (req: e.Request, res: e.Response) => {
-    req.routerMatched = true
+    
     try {
         const { id } = req.params
         if (!id) {
@@ -181,7 +178,7 @@ router.get('/:id', async (req: e.Request, res: e.Response) => {
 
 // 更改
 router.put('/:id', async (req: e.Request, res: e.Response) => {
-    req.routerMatched = true
+    
     try {
         const { id } = req.params
         const { name, descript } = req.body || {}
@@ -215,7 +212,7 @@ router.put('/:id', async (req: e.Request, res: e.Response) => {
 
 // 删除--逻辑删除
 router.delete('/:id', async (req: e.Request, res: e.Response) => {
-    req.routerMatched = true
+    
     let connection
     try {
         const { id } = req.params

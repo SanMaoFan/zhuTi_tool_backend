@@ -1,11 +1,10 @@
-import type NextFunction = require("express");
+
 import type e = require("express")
 
 require('dotenv').config()
 
 const express = require("express")
 const app = express()
-
 const { expressjwt: expressJWT } = require('express-jwt');
 
 
@@ -17,11 +16,6 @@ app.use(express.json())
 const routerModule = require("@router/router")
 
 
-// 设置路由是否响应，为了拦截路由 404 
-app.use((req: e.Request, res: e.Response, next: e.NextFunction) => {
-    req.routerMatched = false
-    next()
-})
 
 // 校验 token
 app.use(expressJWT({
@@ -48,29 +42,67 @@ app.use(expressJWT({
     ]
 }));
 
-
 // 路由初始化
+
+app.get('/api/444', (req, res) => {
+    res.json({ message: '用户信息' });
+});
 routerModule(app)
+
+
+
+// 失败 2025-10-24
+// 提取所有路由
+// const registeredRoutes = new Set()
+
+// 遍历 Express 路由栈，收集所有路由路径
+// app.router.stack.forEach(item => {
+//     if (item.route) {
+//         // 记录路由的方法和路径（eg: GET /api/user）
+//         const methods = Object.keys(item.route.methods).map(m => m.toUpperCase())
+//         methods.forEach(method => {
+//             registeredRoutes.add(`${method} ${item.route.path}`)
+//         })
+//     }
+// })
+
+
 
 //  放置 express-jwt 错误处理中间件（必须在路由之后）
 app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
-    console.log('报错了:', err)
-    // 404 错误处理（路由未匹配）
-    console.log('dangqian luyou', req.routerMatched)
-    if (!req.routerMatched) {
-        return res.status(404).json({ error: `找不到请求的路径: ${req.method} ${req.originalUrl}` });
-    }
-    if (err.name === 'UnauthorizedError') {
-        // 处理 token 无效/过期的情况
-        return res.status(401).send('invalid token 或 token 已过期');
-    } else {
+    if (err) {
+        console.log('报错了:', err)
+        if (err.name === 'UnauthorizedError') {
+            return res.status(401).send('invalid token 或 token 已过期');
+
+            // 失败 2025-10-24
+            // 先判断路由是否 404
+            // 构造请求标识（方法 + 路径，如 GET /api/user）
+            const requestKey = `${req.method} ${req.path}`
+            // 对比路由表中是否存在该路由
+            if (registeredRoutes.has(requestKey)) {
+                // 处理 token 无效/过期的情况
+                // return res.status(401).send('invalid token 或 token 已过期');
+            } else {
+                // 404 错误处理（路由未匹配）
+                return res.status(404).json({ error: `找不到请求的路径: ${req.method} ${req.originalUrl}` });
+            }
+
+        }
         // 其他错误交给下一个错误处理中间件
         next(err);
     }
 });
 
+//  404兜底中间件（处理未被jwt拦截的无效路由）
+app.use((req: e.Request, res: e.Response) => {
+    const requestKey = `${req.method} ${req.path}`;
+    res.status(404).json({ error: `找不到请求的路径: ${requestKey}` });
+});
+
 // 其他通用错误处理中间件（可选）
 app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
+    console.log('、？？？')
     try {
         console.error(err.stack);
         res.status(500).send('服务器内部错误');

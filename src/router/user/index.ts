@@ -21,7 +21,7 @@ const columnList = ["user_id AS userId", "user_name AS userName", "user_phone AS
 
 // 登录
 router.post('/login', async (req: e.Request, res: e.Response) => {
-    req.routerMatched = true
+    
     try {
         const { userPhone, userPwd } = req.body || {}
         const newUserPhone = userPhone?.trim()

@@ -31,7 +31,7 @@ const columnList = ["product_id AS productId", "product_name AS productName", "c
 // 分页
 router.post('/', async (req: e.Request, res: e.Response) => {
     try {
-        req.routerMatched = true
+        
         const { page = 1, pageNo = 10, productId,
             productName,
             startDate,
@@ -77,23 +77,20 @@ router.post('/', async (req: e.Request, res: e.Response) => {
                 queryList.push(objCondition[i] as string)
             }
         }
-        const sql = `SELECT ${columnList.join(',')}, (SELECT COUNT(*) FROM product_table WHERE ${queryList.join(' AND ')}) AS total FROM  product_table WHERE ${queryList.join(' AND ')} ORDER BY create_date DESC LIMIT ?, ?;`
-        const [result] = await mysql.query(sql, [page as number - 1, pageNo])
+        const countSql = `SELECT COUNT(*) total FROM product_table WHERE ${queryList.join(' AND ')}`
+        const sql = `SELECT ${columnList.join(',')} FROM  product_table WHERE ${queryList.join(' AND ')} ORDER BY create_date DESC LIMIT ?, ?;`
+        const [totalResult] = await mysql.query(countSql);
+        const [result] = await mysql.query(sql, [(page as number - 1) * pageNo, pageNo])
 
-        if (result) {
-            let total = 0
-            const newData = result.map(item => {
-                total = item.total
-                delete item.totoal
-                return item
-            })
+        if (result && totalResult) {
+            const [{total}] = totalResult
             return res.status(200).json({
                 message: 'success！',
                 status: 200,
                 data: {
-                    list: newData,
+                    list: result,
                     curPage: page,
-                    count: newData.length,
+                    count: result.length,
                     total
                 }
             })
@@ -111,7 +108,7 @@ router.post('/', async (req: e.Request, res: e.Response) => {
 
 // 新增
 router.post('/add', async (req: e.Request, res: e.Response) => {
-        req.routerMatched = true
+        
     try {
         const { name, parentId, descript } = req.body || {}
         const uuid = hashUtils()
@@ -143,7 +140,7 @@ router.post('/add', async (req: e.Request, res: e.Response) => {
 
 // 更改
 router.put("/:id", async (req: e.Request, res: e.Response) => {
-        req.routerMatched = true
+        
     try {
         const { id } = req.params
         const { name, descript, parentId } = req.body || {}
@@ -176,7 +173,7 @@ router.put("/:id", async (req: e.Request, res: e.Response) => {
 
 // 详情
 router.get('/:id', async (req: e.Request, res: e.Response) => {
-        req.routerMatched = true
+        
     try {
         const { id } = req.params
         const newId = id?.trim()
@@ -219,7 +216,7 @@ router.get('/:id', async (req: e.Request, res: e.Response) => {
 
 // 删除
 router.delete('/:id', async (req: e.Request, res: e.Response) => {
-        req.routerMatched = true
+        
     try {
         const { id } = req.params
         const newId = id?.trim()
