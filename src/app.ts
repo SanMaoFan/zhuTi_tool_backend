@@ -43,10 +43,10 @@ app.use(expressJWT({
 }));
 
 // 路由初始化
-
-app.get('/api/444', (req, res) => {
-    res.json({ message: '用户信息' });
-});
+// 测试用例（收集路由）
+// app.get('/api/444', (req, res) => {
+//     res.json({ message: '用户信息' });
+// });
 routerModule(app)
 
 
@@ -73,7 +73,10 @@ app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
     if (err) {
         console.log('报错了:', err)
         if (err.name === 'UnauthorizedError') {
-            return res.status(401).send('invalid token 或 token 已过期');
+            return res.status(401).send({
+                status: 401,
+                message: 'invalid token 或 token 已过期'
+            });
 
             // 失败 2025-10-24
             // 先判断路由是否 404
@@ -85,7 +88,7 @@ app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
                 // return res.status(401).send('invalid token 或 token 已过期');
             } else {
                 // 404 错误处理（路由未匹配）
-                return res.status(404).json({ error: `找不到请求的路径: ${req.method} ${req.originalUrl}` });
+                return res.status(404).json({ status: 404, message: `找不到请求的路径: ${req.method} ${req.originalUrl}` });
             }
 
         }
@@ -94,15 +97,15 @@ app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
     }
 });
 
-//  404兜底中间件（处理未被jwt拦截的无效路由）
-app.use((req: e.Request, res: e.Response) => {
-    const requestKey = `${req.method} ${req.path}`;
-    res.status(404).json({ error: `找不到请求的路径: ${requestKey}` });
-});
+//  404兜底中间件（处理未被jwt拦截的无效路由）-- 当前失败，那些需要 token 的地址，会直接提示 404
+// app.use((req: e.Request, res: e.Response) => {
+//     const requestKey = `${req.method} ${req.path}`;
+//     console.log(requestKey)
+//     res.status(404).json({ status: 404, message: `找不到请求的路径: ${requestKey}` });
+// });
 
 // 其他通用错误处理中间件（可选）
 app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
-    console.log('、？？？')
     try {
         console.error(err.stack);
         res.status(500).send('服务器内部错误');

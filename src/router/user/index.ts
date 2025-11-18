@@ -21,7 +21,7 @@ const columnList = ["user_id AS userId", "user_name AS userName", "user_phone AS
 
 // 登录
 router.post('/login', async (req: e.Request, res: e.Response) => {
-    
+
     try {
         const { userPhone, userPwd } = req.body || {}
         const newUserPhone = userPhone?.trim()
@@ -33,8 +33,8 @@ router.post('/login', async (req: e.Request, res: e.Response) => {
             })
         }
         // 查询user_id
-        const queryUserExistSql = `SELECT * FROM user_table WHERE user_phone = ?`
-        const [result, fields] = await mysql.query(queryUserExistSql, [newUserPhone])
+        const queryUserExistSql = `SELECT * FROM user_table WHERE user_phone = ? AND user_pwd = ?`
+        const [result, fields] = await mysql.query(queryUserExistSql, [newUserPhone, newUserPwd])
 
         if (0 === result.length) {
             return res.status(200).json({
@@ -42,10 +42,10 @@ router.post('/login', async (req: e.Request, res: e.Response) => {
                 status: 404
             })
         } else if (result[0].user_pwd === newUserPwd && newUserPhone === result[0].user_phone) {
-            const [{ user_id, user_name, user_phone }] = result
+            const [{ user_id, user_phone }] = result
             const token = jwt.sign(
                 // 存用户身份信息（
-                { userId: user_id, username: user_name },
+                { userId: user_id, userPhone: user_phone },
                 // 用服务器密钥加密
                 process.env.SECRET_KEY,
                 // 配置（Token有效期1小时）
@@ -60,7 +60,6 @@ router.post('/login', async (req: e.Request, res: e.Response) => {
                     status: 200,
                     data: {
                         userPhone: user_phone,
-                        userName: user_name,
                         token
                     }
                 })
@@ -101,23 +100,38 @@ router.post('/', (req: e.Request, res: e.Response) => {
 })
 
 // 新增
-router.post('/add', (req: e.Request, res: e.Response) => {
-    const { name, phone } = req.body || {}
-    const uuid = hashUtils()
-    const newName = name?.trim(), newPhone = phone?.trim()
-    if (!newName || !newPhone) {
+router.post('/add', async (req: e.Request, res: e.Response) => {
+    try {
+        const { userPwd, userPhone } = req.body || {}
+        const uuid = hashUtils()
+        const newPwd = userPwd?.trim(), newPhone = userPhone?.trim()
+        if (!newPwd || !newPhone) {
+            return res.status(200).json({
+                message: '手机号 userPhone 以及密码 userPwd 不能为空！',
+                status: 500
+            })
+        }
+        const sql = `INSERT INTO user_table (user_id, user_name, user_pwd, user_phone) VALUES (?, ?, ?, ?);`
+        const [result, fields] = await mysql.query(sql, [uuid, userPhone, newPwd, newPhone])
+        if (result) {
+            return res.status(200).json({
+                message: 'success！',
+                status: 200,
+            })
+        } else {
+            return res.status(200).json({
+                message: '添加用户失败',
+                status: 500,
+            })
+        }
+    } catch (e) {
+        console.log('user add error: ', e)
         return res.status(200).json({
-            message: '名称 name 以及手机号 phone 不能为空！',
+            message: '处理错误，请重试！',
             status: 500
         })
     }
-    const sql = `INSERT INTO user_table (user_id, user_name, user_phone) VALUES ("${uuid}", "${newName}",  "${newPhone}");`
-    mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
-        return res.status(200).json({
-            message: 'success！',
-            status: 200,
-        })
-    }, err))
+
 })
 
 // 更改
