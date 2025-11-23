@@ -31,7 +31,7 @@ const columnList = ["product_id AS productId", "product_name AS productName", "c
 // 分页
 router.post('/', async (req: e.Request, res: e.Response) => {
     try {
-        
+        const {userId} = req.auth
         const { page = 1, pageNo = 10, productId,
             productName,
             startDate,
@@ -56,14 +56,16 @@ router.post('/', async (req: e.Request, res: e.Response) => {
             productName,
             parentId,
             date: true,
-            isDel
+            isDel,
+            userId
         }
         const objCondition: { [key: string]: string } = {
             productId: `product_id = "${productId}"`,
             productName: `product_Name LIKE "%${productName}%"`,
             date: `(create_date BETWEEN "${newStartDate}" AND "${newEndDate}")`,
             parentId: `parent_id = "${parentId}"`,
-            isDel: `is_del = ${isDel}`
+            isDel: `is_del = ${isDel}`,
+            userId: `user_id = "${userId}"`
         }
 
         // 组合条件
@@ -108,8 +110,8 @@ router.post('/', async (req: e.Request, res: e.Response) => {
 
 // 新增
 router.post('/add', async (req: e.Request, res: e.Response) => {
-        
     try {
+        const {userId} = req.auth
         const { name, parentId, descript } = req.body || {}
         const uuid = hashUtils()
         const newName = name?.trim(), newId = parentId?.trim(), newDescript = descript?.trim()
@@ -119,8 +121,8 @@ router.post('/add', async (req: e.Request, res: e.Response) => {
                 status: 500
             })
         }
-        const sql = `INSERT INTO product_table (product_id, product_name, product_descript, parent_id) VALUES (?, ?, ?, ?);`
-        const [result] = await mysql.query(sql, [uuid, newName, newDescript ? newDescript : null, newId])
+        const sql = `INSERT INTO product_table (user_id, product_id, product_name, product_descript, parent_id) VALUES (?, ?, ?, ?, ?);`
+        const [result] = await mysql.query(sql, [userId, uuid, newName, newDescript ? newDescript : null, newId])
         if (result) {
             return res.status(200).json({
                 message: 'success！',
@@ -140,8 +142,8 @@ router.post('/add', async (req: e.Request, res: e.Response) => {
 
 // 更改
 router.put("/:id", async (req: e.Request, res: e.Response) => {
-        
     try {
+        const {userId} = req.auth
         const { id } = req.params
         const { name, descript, parentId } = req.body || {}
         const newName = name?.trim(), newDescript = descript?.trim(), newParentId = parentId?.trim(), newId = id?.trim()
@@ -152,8 +154,8 @@ router.put("/:id", async (req: e.Request, res: e.Response) => {
                 status: 500
             })
         }
-        const sql = `UPDATE product_table SET product_name = ?, product_descript = ?, parent_id = ? WHERE product_id = ?;`
-        const [result] = await mysql.query(sql, [newName, newDescript ? newDescript : null, newParentId, newId])
+        const sql = `UPDATE product_table SET product_name = ?, product_descript = ?, parent_id = ? WHERE user_id = ? AND product_id = ?;`
+        const [result] = await mysql.query(sql, [newName, newDescript ? newDescript : null, newParentId, userId, newId])
         if (result) {
             return res.status(200).json({
                 message: 'success！',
@@ -173,8 +175,8 @@ router.put("/:id", async (req: e.Request, res: e.Response) => {
 
 // 详情
 router.get('/:id', async (req: e.Request, res: e.Response) => {
-        
     try {
+        const {userId} = req.auth
         const { id } = req.params
         const newId = id?.trim()
         if (!newId) {
@@ -191,9 +193,9 @@ router.get('/:id', async (req: e.Request, res: e.Response) => {
         JOIN 
         type_table AS t
         ON p.parent_id = t.type_id
-        WHERE p.product_id = ?;`
+        WHERE p.user_id = ? AND p.product_id = ?;`
 
-        const [result] = await mysql.query(sql, [newId])
+        const [result] = await mysql.query(sql, [userId, newId])
         if (result) {
             return res.status(200).json({
                 message: "success！",
@@ -216,8 +218,8 @@ router.get('/:id', async (req: e.Request, res: e.Response) => {
 
 // 删除
 router.delete('/:id', async (req: e.Request, res: e.Response) => {
-        
     try {
+        const {userId} = req.auth
         const { id } = req.params
         const newId = id?.trim()
         if (!newId) {
@@ -227,9 +229,9 @@ router.delete('/:id', async (req: e.Request, res: e.Response) => {
             })
         }
 
-        const sql = `UPDATE product_table SET is_del = 1 WHERE product_id = ?`
+        const sql = `UPDATE product_table SET is_del = 1 WHERE user_id = ? AND product_id = ?`
 
-        const [result] = await mysql.query(sql, [newId])
+        const [result] = await mysql.query(sql, [userId, newId])
         if (result) {
             return res.status(200).json({
                 message: "success！",
@@ -245,7 +247,6 @@ router.delete('/:id', async (req: e.Request, res: e.Response) => {
         mysqlCallback(res, () => { }, e)
         throw e
     }
-
 })
 
 

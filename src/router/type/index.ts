@@ -36,6 +36,7 @@ router.post('/', async (req: e.Request, res: e.Response) => {
             startDate,
             endDate,
             isDel = 0 } = req.body || {}
+        const {userId} = req.auth
         let newStartDate, newEndDate
         // 判断 开始日期 与 结束日期 是否有成对
         if ((startDate && !endDate) || (!startDate && endDate)) {
@@ -51,14 +52,16 @@ router.post('/', async (req: e.Request, res: e.Response) => {
             typeId,
             typeName,
             isDel,
-            date: true
+            date: true,
+            userId
         }
 
         const objCondition: { [key: string]: string } = {
             typeId: `type_id = "${typeId}"`,
             typeName: `type_name LIKE "%${typeName}%"`,
             isDel: `is_del = ${isDel}`,
-            date: `BETWEEN "${newStartDate}" AND "${newEndDate}"`
+            date: `BETWEEN "${newStartDate}" AND "${newEndDate}"`,
+            userId: `user_id = "${userId}"`
         }
 
         const conditionList: string[] = []
@@ -111,6 +114,7 @@ router.post('/add', async (req: e.Request, res: e.Response) => {
     
     try {
         const { name, descript } = req.body || {}
+        const {userId} = req.auth
         const newName = name?.trim()
         const newDescript = descript?.trim()
         if (!newName) {
@@ -122,9 +126,9 @@ router.post('/add', async (req: e.Request, res: e.Response) => {
         // 数据库新增数据
         const uuid = hashUtils()
 
-        const sql = `INSERT INTO type_table (type_id, type_name, type_descript) VALUES (?, ?, ?);`
+        const sql = `INSERT INTO type_table (user_id, type_id, type_name, type_descript) VALUES (?, ?, ?, ?);`
 
-        const [result] = await mysql.query(sql, [uuid, newName, newDescript ? newDescript : null])
+        const [result] = await mysql.query(sql, [userId, uuid, newName, newDescript ? newDescript : null])
 
         if (result) {
             res.status(200).json({
@@ -145,9 +149,9 @@ router.post('/add', async (req: e.Request, res: e.Response) => {
 
 // 获取详情
 router.get('/:id', async (req: e.Request, res: e.Response) => {
-    
     try {
         const { id } = req.params
+        const {userId} = req.auth
         if (!id) {
             return res.status(200).json({
                 message: "缺少查询的 id！",
@@ -155,8 +159,8 @@ router.get('/:id', async (req: e.Request, res: e.Response) => {
             })
         }
 
-        const sql = `SELECT ${columnList.join(',')} FROM type_table WHERE type_id = ?;`
-        const [result] = await mysql.query(sql, [id])
+        const sql = `SELECT ${columnList.join(',')} FROM type_table WHERE user_id = ? AND type_id = ?;`
+        const [result] = await mysql.query(sql, [userId, id])
 
         if (result) {
             return res.status(200).json({
@@ -178,9 +182,9 @@ router.get('/:id', async (req: e.Request, res: e.Response) => {
 
 // 更改
 router.put('/:id', async (req: e.Request, res: e.Response) => {
-    
     try {
         const { id } = req.params
+        const {userId} = req.auth
         const { name, descript } = req.body || {}
         const newName = name?.trim()
         const newDescript = descript?.trim()
@@ -190,8 +194,8 @@ router.put('/:id', async (req: e.Request, res: e.Response) => {
                 status: 500,
             })
         }
-        const sql = `UPDATE type_table SET type_name = ?, type_descript = ? WHERE type_id = ?`
-        const [result] = await mysql.query(sql, [newName, newDescript ? newDescript : null, id])
+        const sql = `UPDATE type_table SET type_name = ?, type_descript = ? WHERE user_id = ? AND type_id = ?`
+        const [result] = await mysql.query(sql, [newName, newDescript ? newDescript : null, userId, id])
         if (result) {
             return res.status(200).json({
                 message: 'success！',
@@ -212,10 +216,10 @@ router.put('/:id', async (req: e.Request, res: e.Response) => {
 
 // 删除--逻辑删除
 router.delete('/:id', async (req: e.Request, res: e.Response) => {
-    
     let connection
     try {
         const { id } = req.params
+        const {userId} = req.auth
         const newId = id?.trim()
         if (!newId) {
             return res.status(200).json({
@@ -233,10 +237,10 @@ router.delete('/:id', async (req: e.Request, res: e.Response) => {
                 console.log('del type sql 事务执行中')
                 // 进行分类的删除逻辑
                 console.log('ID为', newId)
-                connection.query(`UPDATE type_table SET is_del = 1 WHERE type_id = ?`, [newId])
+                connection.query(`UPDATE type_table SET is_del = 1 WHERE user_id = ? AND type_id = ?`, [userId, newId])
 
                 // 进行物品的删除逻辑
-                connection.query(`UPDATE product_table SET is_del = 1 WHERE parent_id = ?`, [newId])
+                connection.query(`UPDATE product_table SET is_del = 1 WHERE user_id = ? AND parent_id = ?`, [userId, newId])
 
 
                 // 6. 所有操作成功，提交事务

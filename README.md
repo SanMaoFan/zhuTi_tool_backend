@@ -46,3 +46,12 @@
     CONSTRAINT `product_table_parent_id_uk` FOREIGN KEY (`parent_id`) REFERENCES `type_table` (`type_id`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8
 ```
+
+
+## 开发任务
+
+- 将所有关于 200 以外的状态统一为 200
+- 将所有未关联 userID 的数据绑定上 userID
+- 重新记录表的创建代码
+- 新增日志功能，在每个表上加入触发器
+- 统一处理关于数据库获取数据的错误事件

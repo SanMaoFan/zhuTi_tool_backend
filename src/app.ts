@@ -6,6 +6,7 @@ require('dotenv').config()
 const express = require("express")
 const app = express()
 const { expressjwt: expressJWT } = require('express-jwt');
+const jwt = require('jsonwebtoken');
 
 
 
@@ -26,6 +27,13 @@ app.use(expressJWT({
         const isBearer = req.headers.authorization?.split(" ")[0] === 'Bearer'
         if (req.headers.authorization && isBearer) {
             const [, token] = req.headers.authorization.split(" ")
+            // jwt.verify(token,process.env.SECRET_KEY,(err: Error,user: any) => {
+            //     if(err){
+            //         console.log('解析 token 错误', err)
+            //     }else{
+            //         req.user = user
+            //     }
+            // })
             return token
         } else {
             return null
@@ -73,7 +81,7 @@ app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
     if (err) {
         console.log('报错了:', err)
         if (err.name === 'UnauthorizedError') {
-            return res.status(401).send({
+            return res.status(200).send({
                 status: 401,
                 message: 'invalid token 或 token 已过期'
             });
@@ -88,7 +96,7 @@ app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
                 // return res.status(401).send('invalid token 或 token 已过期');
             } else {
                 // 404 错误处理（路由未匹配）
-                return res.status(404).json({ status: 404, message: `找不到请求的路径: ${req.method} ${req.originalUrl}` });
+                return res.status(200).json({ status: 404, message: `找不到请求的路径: ${req.method} ${req.originalUrl}` });
             }
 
         }
@@ -108,7 +116,10 @@ app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
 app.use((err: Error, req: e.Request, res: e.Response, next: e.NextFunction) => {
     try {
         console.error(err.stack);
-        res.status(500).send('服务器内部错误');
+        res.status(200).send({
+            statuc: 500,
+            message: '服务器内部错误'
+        });
     } catch (e) {
         console.log('拦截错误', err.message)
     }

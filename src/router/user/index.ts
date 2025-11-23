@@ -50,7 +50,7 @@ router.post('/login', async (req: e.Request, res: e.Response) => {
                 process.env.SECRET_KEY,
                 // 配置（Token有效期1小时）
                 {
-                    expiresIn: '1h',
+                    expiresIn: '24h',
                     algorithm: process.env.ALGORITHM
                 }
             );
@@ -146,7 +146,7 @@ router.put("/:id", (req: e.Request, res: e.Response) => {
             status: 500
         })
     }
-    const sql = `UPDATE user_table SET user_name = "${newName}", user_phone = "${newPhone}" WHERE user_id = "${newId}";`
+    const sql = `UPDATE user_table SET user_name = "${newName}", user_phone = "${newPhone}", update_user_id = ? WHERE user_id = "${newId}";`
 
     mysql.query(sql, (err: Error, data: any) => mysqlCallback(res, () => {
         return res.status(200).json({
